@@ -21,7 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdint.h>
+#include "z_displ_ST7735.h"
+#include "z_displ_ST7735_test.h"
+#include "fonts.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
+DMA_HandleTypeDef hdma_spi1_tx;
 
 /* USER CODE BEGIN PV */
 
@@ -49,102 +52,15 @@ SPI_HandleTypeDef hspi1;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-void ST7735_WriteCommand(uint8_t cmd);
-void ST7735_WriteData(uint8_t data);
-void ST7735_Init(void);
-void ST7735_SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);
-void ST7735_DrawChar(uint8_t x, uint8_t y, char c, uint16_t color, uint16_t bgcolor);
-void ST7735_DrawString(uint8_t x, uint8_t y, char *str, uint16_t color, uint16_t bgcolor);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-// ST7735S命令定义
-#define ST7735_NOP     0x00
-#define ST7735_SWRESET 0x01
-#define ST7735_SLPIN   0x10
-#define ST7735_SLPOUT  0x11
-#define ST7735_DISPOFF 0x28
-#define ST7735_DISPON  0x29
-#define ST7735_CASET   0x2A
-#define ST7735_RASET   0x2B
-#define ST7735_RAMWR   0x2C
 
-// 发送命令函数
-void ST7735_WriteCommand(uint8_t cmd) {
-    HAL_GPIO_WritePin(DC_GPIO_Port, DC_Pin, GPIO_PIN_RESET); // DC低电平表示命令
-    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET); // CS低电平选中
-    HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET); // CS高电平取消选中
-}
-
-// 发送数据函数
-void ST7735_WriteData(uint8_t data) {
-    HAL_GPIO_WritePin(DC_GPIO_Port, DC_Pin, GPIO_PIN_SET); // DC高电平表示数据
-    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET); // CS低电平选中
-    HAL_SPI_Transmit(&hspi1, &data, 1, HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET); // CS高电平取消选中
-}
-
-// 初始化显示屏
-void ST7735_Init(void) {
-    HAL_GPIO_WritePin(RES_GPIO_Port, RES_Pin, GPIO_PIN_RESET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(RES_GPIO_Port, RES_Pin, GPIO_PIN_SET);
-    HAL_Delay(100);
-    
-    ST7735_WriteCommand(ST7735_SLPOUT); // 退出睡眠模式
-    HAL_Delay(120);
-    ST7735_WriteCommand(ST7735_DISPON); // 开启显示
-}
-
-// 设置显示区域
-void ST7735_SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
-    ST7735_WriteCommand(ST7735_CASET); // 列地址设置
-    ST7735_WriteData(0x00);
-    ST7735_WriteData(x0);
-    ST7735_WriteData(0x00);
-    ST7735_WriteData(x1);
-    
-    ST7735_WriteCommand(ST7735_RASET); // 行地址设置
-    ST7735_WriteData(0x00);
-    ST7735_WriteData(y0);
-    ST7735_WriteData(0x00);
-    ST7735_WriteData(y1);
-    
-    ST7735_WriteCommand(ST7735_RAMWR); // 写入RAM
-}
-
-// 显示字符函数
-void ST7735_DrawChar(uint8_t x, uint8_t y, char c, uint16_t color, uint16_t bgcolor) {
-    // 简单实现，实际应用中可以使用字体数据
-    ST7735_SetWindow(x, y, x+7, y+7);
-    for(uint8_t i=0; i<8; i++) {
-        for(uint8_t j=0; j<8; j++) {
-            if((i==0) || (i==7) || (j==0) || (j==7)) {
-                ST7735_WriteData(color >> 8);
-                ST7735_WriteData(color & 0xFF);
-            } else {
-                ST7735_WriteData(bgcolor >> 8);
-                ST7735_WriteData(bgcolor & 0xFF);
-            }
-        }
-    }
-}
-
-// 显示字符串函数
-void ST7735_DrawString(uint8_t x, uint8_t y, char *str, uint16_t color, uint16_t bgcolor) {
-    while(*str) {
-        ST7735_DrawChar(x, y, *str++, color, bgcolor);
-        x += 8;
-        if(x > 120) {
-            x = 0;
-            y += 8;
-        }
-    }
-}
 /* USER CODE END 0 */
 
 /**
@@ -176,16 +92,20 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  ST7735_Init(); // 初始化显示屏
-  ST7735_DrawString(20, 40, "Hello World", 0xF800, 0x0000); // 红色文字，黑色背景
+
+  Displ_Init(Displ_Orientat_0);		// initialize the display and set the initial display orientation (here is orientaton: 0°) - THIS FUNCTION MUST PRECEED ANY OTHER DISPLAY FUNCTION CALL.
+  Displ_CLS(BLACK);			// after initialization (above) and before turning on backlight (below), you can draw the initial display appearance. (here I'm just clearing display with a black background)
+  Displ_BackLight('I');  			// initialize backlight and turn it on at init level
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  Displ_PerfTest();		// shows display graphics and performance
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -207,7 +127,7 @@ void SystemClock_Config(void)
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV2;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
@@ -250,12 +170,12 @@ static void MX_SPI1_Init(void)
   /* SPI1 parameter configuration*/
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.Direction = SPI_DIRECTION_1LINE;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -267,6 +187,22 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 4, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
 
 }
 
@@ -283,25 +219,26 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DISPL_LED_GPIO_Port, DISPL_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, RES_Pin|DC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DISPL_RST_Pin|DISPL_DC_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : CS_Pin */
-  GPIO_InitStruct.Pin = CS_Pin;
+  /*Configure GPIO pin : DISPL_LED_Pin */
+  GPIO_InitStruct.Pin = DISPL_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(CS_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(DISPL_LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RES_Pin DC_Pin */
-  GPIO_InitStruct.Pin = RES_Pin|DC_Pin;
+  /*Configure GPIO pins : DISPL_RST_Pin DISPL_DC_Pin */
+  GPIO_InitStruct.Pin = DISPL_RST_Pin|DISPL_DC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -313,6 +250,68 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+ * @brief Custom delay function using simple loop
+ * @param ms: delay time in milliseconds
+ * @retval None
+ */
+void Custom_Delay(uint32_t ms)
+{
+    // Debug-friendly delay function
+    // For STM32F103C8T6 at 72MHz
+    // Each iteration takes ~72 cycles (24 NOPs + loop overhead)
+    // 72MHz / 72 = 1MHz cycles per iteration
+    // For 1ms delay: 1MHz / 1000 = 1000 iterations
+    uint32_t iterations = ms * 1000; // Reduced from 24000 to 1000
+    
+    for(uint32_t i = 0; i < iterations; i++)
+    {
+        // Use multiple NOPs to reduce loop count while maintaining timing
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+        __asm("nop");
+    }
+}
+
+/**
+ * @brief Ultra-light delay function for debugging
+ * @param ms: delay time in milliseconds
+ * @retval None
+ */
+void Debug_Delay(uint32_t ms)
+{
+    // Minimal delay for debugging - very few iterations
+    // Prevents debugger timeouts and performance issues
+    volatile uint32_t iterations = ms * 100; // Very light for debugging
+    
+    while(iterations--)
+    {
+        // Minimal overhead loop
+    }
+}
 
 /* USER CODE END 4 */
 
@@ -327,6 +326,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    /* Error occurred - program halted */
   }
   /* USER CODE END Error_Handler_Debug */
 }
