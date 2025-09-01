@@ -119,7 +119,7 @@ For PWM dimming:
 // In main() function
 Displ_Init(Displ_Orientat_0);    // Initialize display
 Displ_CLS(BLACK);                // Clear screen
-Displ_BackLight('I');            // Initialize and turn on backlight
+Displ_BackLight('1');            // Initialize and turn on backlight
 ```
 
 ## 📊 Performance Testing
