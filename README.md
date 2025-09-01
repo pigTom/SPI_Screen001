@@ -1,5 +1,7 @@
 # STM32 ST7735S TFT Display Driver
 
+![Project Demo](main.jpg)
+
 A comprehensive STM32 project for driving ST7735S TFT displays with performance testing and graphics capabilities.
 
 ## 📋 Project Overview
