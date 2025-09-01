@@ -24,6 +24,7 @@
 #include "z_displ_ST7735.h"
 #include "z_displ_ST7735_test.h"
 #include "fonts.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -98,7 +99,7 @@ int main(void)
 
   Displ_Init(Displ_Orientat_0);		// initialize the display and set the initial display orientation (here is orientaton: 0°) - THIS FUNCTION MUST PRECEED ANY OTHER DISPLAY FUNCTION CALL.
   Displ_CLS(BLACK);			// after initialization (above) and before turning on backlight (below), you can draw the initial display appearance. (here I'm just clearing display with a black background)
-  Displ_BackLight('I');  			// initialize backlight and turn it on at init level
+  Displ_BackLight('1');  // 确保背光打开
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -323,10 +324,60 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+
+  // Disable interrupts to prevent further issues
   __disable_irq();
+
+  // Error indication using LED (fast blinking pattern)
+  // Configure LED pin as output if not already done
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  GPIO_InitStruct.Pin = DISPL_LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DISPL_LED_GPIO_Port, &GPIO_InitStruct);
+
+  // Send error message via ITM (SWO) for debugging
+  // This will appear in the debugger's SWO viewer
+  const char* error_msg = "ERROR: System Error Handler Called!\r\n";
+  for(int i = 0; error_msg[i] != '\0'; i++) {
+    ITM_SendChar(error_msg[i]);
+  }
+
+  // Get system information for debugging
+  uint32_t device_id = HAL_GetDEVID();
+  uint32_t revision_id = HAL_GetREVID();
+  uint32_t uid0 = HAL_GetUIDw0();
+
+  // Send device info via ITM
+  char debug_buffer[100];
+  sprintf(debug_buffer, "Device ID: 0x%08lX, Rev: 0x%08lX, UID: 0x%08lX\r\n",
+          device_id, revision_id, uid0);
+  for(int i = 0; debug_buffer[i] != '\0'; i++) {
+    ITM_SendChar(debug_buffer[i]);
+  }
+
+  // Error indication loop with LED blinking
   while (1)
   {
-    /* Error occurred - program halted */
+    // Fast blink pattern: 3 quick flashes, then pause
+    for(int i = 0; i < 3; i++) {
+      HAL_GPIO_WritePin(DISPL_LED_GPIO_Port, DISPL_LED_Pin, GPIO_PIN_SET);
+      Debug_Delay(100);  // 100ms on
+      HAL_GPIO_WritePin(DISPL_LED_GPIO_Port, DISPL_LED_Pin, GPIO_PIN_RESET);
+      Debug_Delay(100);  // 100ms off
+    }
+
+    // Longer pause between sequences
+    Debug_Delay(1000);  // 1 second pause
+
+    // Send periodic error message
+    ITM_SendChar('E');
+    ITM_SendChar('R');
+    ITM_SendChar('R');
+    ITM_SendChar('\r');
+    ITM_SendChar('\n');
   }
   /* USER CODE END Error_Handler_Debug */
 }
